@@ -245,14 +245,14 @@ class MainWindow(ctk.CTk):
             options_frame,
             text="Dense Mode (detailed prompts)",
             variable=self.dense_mode_var
-        ).pack(anchor="w", padx=20, pady=2)
+        ).pack(anchor="w", padx=20, pady=(5, 5))
         
         self.character_consistency_var = ctk.BooleanVar(value=False)
         ctk.CTkCheckBox(
             options_frame,
             text="Character Consistency",
             variable=self.character_consistency_var
-        ).pack(anchor="w", padx=20, pady=(2, 10))
+        ).pack(anchor="w", padx=20, pady=(5, 15))
         
         # Progress section
         progress_frame = ctk.CTkFrame(middle_frame)
