@@ -16,6 +16,9 @@ from exceptions import TextProcessingError, APIError
 
 logger = logging.getLogger(__name__)
 
+# Alias for backward compatibility
+ProcessingConfig = Settings
+
 
 class StoryProcessor:
     """Process biographical stories and generate image prompts."""
