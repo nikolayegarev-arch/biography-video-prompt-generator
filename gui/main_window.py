@@ -254,8 +254,6 @@ class MainWindow(ctk.CTk):
             variable=self.character_consistency_var
         ).pack(anchor="w", padx=20, pady=2)
         
-        options_frame.pack_configure(pady=(10, 5))
-        
         # Progress section
         progress_frame = ctk.CTkFrame(middle_frame)
         progress_frame.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
