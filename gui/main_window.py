@@ -232,7 +232,7 @@ class MainWindow(ctk.CTk):
         
         # Options section
         options_frame = ctk.CTkFrame(middle_frame)
-        options_frame.grid(row=0, column=0, padx=10, pady=(10, 5), sticky="ew")
+        options_frame.grid(row=0, column=0, padx=10, pady=(10, 5), sticky="nsew")
         
         ctk.CTkLabel(
             options_frame,
