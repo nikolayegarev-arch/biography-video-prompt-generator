@@ -252,7 +252,7 @@ class MainWindow(ctk.CTk):
             options_frame,
             text="Character Consistency",
             variable=self.character_consistency_var
-        ).pack(anchor="w", padx=20, pady=2)
+        ).pack(anchor="w", padx=20, pady=(2, 10))
         
         # Progress section
         progress_frame = ctk.CTkFrame(middle_frame)
