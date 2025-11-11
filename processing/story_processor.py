@@ -136,13 +136,15 @@ class StoryProcessor:
                     metadata["scenes"] = all_scenes
                     save_json(partial_path, metadata)
                     
-                    logger.info(
-                        f"Chunk {chunk_idx + 1}/{total_chunks} complete. "
-                        f"Total scenes: {len(all_scenes)}"
-                    )
+                    # Log to both logger and GUI
+                    chunk_msg = f"Chunk {chunk_idx + 1}/{total_chunks} complete. Total scenes: {len(all_scenes)}"
+                    logger.info(chunk_msg)
+                    if progress_callback:
+                        progress_callback(chunk_msg, 10 + (80 * (chunk_idx + 1) / total_chunks))
                 
                 # Finalize metadata
                 metadata["total_prompts"] = len(all_scenes)
+                metadata["metadata"]["total_prompts"] = len(all_scenes)  # Update nested path too
                 metadata["scenes"] = all_scenes
                 
                 # Save final outputs

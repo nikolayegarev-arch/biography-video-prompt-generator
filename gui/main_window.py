@@ -478,6 +478,9 @@ class MainWindow(ctk.CTk):
                 
                 def progress_callback(message: str, percent: float):
                     self.update_progress(message, percent / 100.0)
+                    # Also log chunk completion messages to GUI
+                    if "Chunk" in message and "complete" in message:
+                        self.log(f"  {message}")
                 
                 try:
                     result = processor.process_file(
