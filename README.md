@@ -19,6 +19,13 @@ Biography Video Prompt Generator is a modular Python application designed to ana
 - ✅ **Retry with Exponential Backoff**: Up to 5 retry attempts
 - ✅ **HTTP 429 Handling**: Graceful rate limit exceeded handling
 
+#### Prompt Quality & Deduplication (NEW!)
+- ✅ **Deduplication System**: Automatically removes duplicate prompts using similarity matching (>85% threshold)
+- ✅ **Quality Filtering**: Filters out low-quality prompts based on comprehensive scoring (0-1 scale)
+- ✅ **Automatic Enhancement**: Improves prompts by removing repetition, fixing formatting, adding technical descriptors
+- ✅ **Context-Aware Generation**: Passes recent prompts to AI to avoid repetitive visual elements
+- ✅ **Quality Metrics**: Provides diversity analysis, vocabulary size, and quality scores in output
+
 #### Text Processing
 - ✅ **Text Chunking**: Splits large texts by ~1000 words
 - ✅ **Scene Splitting**: Divides into 5-7 second scenes
@@ -64,6 +71,10 @@ Biography Video Prompt Generator is a modular Python application designed to ana
 - ✅ **Processing Options**:
   - Dense mode (detailed prompts)
   - Character consistency
+- ✅ **Quality Settings** (NEW!):
+  - Enable/disable deduplication
+  - Enable/disable quality filter
+  - Enable/disable automatic enhancement
 - ✅ **Progress Tracking**: Real-time progress bar and status
 - ✅ **Logs**: Live processing logs
 - ✅ **Estimated Images**: Automatic calculation
@@ -177,7 +188,16 @@ python main.py
     "total_chunks": 12,
     "processed_chunks": 12,
     "dense_mode": false,
-    "character_consistency": false
+    "character_consistency": false,
+    "deduplication_enabled": true,
+    "quality_filter_enabled": true,
+    "quality_metrics": {
+      "avg_prompt_length": 145.3,
+      "vocabulary_size": 1250,
+      "avg_quality_score": 0.78,
+      "min_quality_score": 0.52,
+      "max_quality_score": 0.95
+    }
   },
   "scenes": [
     {
@@ -289,6 +309,13 @@ Biography Video Prompt Generator — это модульное Python-прило
 - ✅ **Retry с exponential backoff**: До 5 попыток
 - ✅ **Обработка HTTP 429**: Корректная обработка превышения лимитов
 
+#### Качество промптов и дедупликация (НОВОЕ!)
+- ✅ **Система дедупликации**: Автоматически удаляет дубликаты промптов с использованием сопоставления схожести (порог >85%)
+- ✅ **Фильтрация качества**: Фильтрует низкокачественные промпты на основе комплексной оценки (шкала 0-1)
+- ✅ **Автоматическое улучшение**: Улучшает промпты, удаляя повторы, исправляя форматирование, добавляя технические дескрипторы
+- ✅ **Контекстно-зависимая генерация**: Передает недавние промпты AI для избежания повторяющихся визуальных элементов
+- ✅ **Метрики качества**: Предоставляет анализ разнообразия, размер словаря и оценки качества в выводе
+
 #### Обработка текста
 - ✅ **Chunking**: Разделение больших текстов по ~1000 слов
 - ✅ **Scene splitting**: Деление на сцены по 5-7 секунд
@@ -334,6 +361,10 @@ Biography Video Prompt Generator — это модульное Python-прило
 - ✅ **Опции обработки**:
   - Dense mode (детальные промпты)
   - Консистентность персонажей
+- ✅ **Настройки качества** (НОВОЕ!):
+  - Включение/отключение дедупликации
+  - Включение/отключение фильтра качества
+  - Включение/отключение автоматического улучшения
 - ✅ **Отслеживание прогресса**: Прогресс-бар и статус в реальном времени
 - ✅ **Логи**: Логи обработки в реальном времени
 - ✅ **Оценка изображений**: Автоматический расчет
@@ -447,7 +478,16 @@ python main.py
     "total_chunks": 12,
     "processed_chunks": 12,
     "dense_mode": false,
-    "character_consistency": false
+    "character_consistency": false,
+    "deduplication_enabled": true,
+    "quality_filter_enabled": true,
+    "quality_metrics": {
+      "avg_prompt_length": 145.3,
+      "vocabulary_size": 1250,
+      "avg_quality_score": 0.78,
+      "min_quality_score": 0.52,
+      "max_quality_score": 0.95
+    }
   },
   "scenes": [
     {
