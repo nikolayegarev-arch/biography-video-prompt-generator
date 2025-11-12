@@ -247,7 +247,7 @@ class MainWindow(ctk.CTk):
             variable=self.dense_mode_var
         ).pack(anchor="w", padx=20, pady=(5, 5))
         
-                self.character_consistency_var = ctk.BooleanVar(value=False)
+        self.character_consistency_var = ctk.BooleanVar(value=False)
         ctk.CTkCheckBox(
             options_frame,
             text="Character Consistency",
