@@ -96,6 +96,14 @@ class StoryProcessor:
             total_prompts = timeline["total_prompts"]
             logger.info(f"Target: {total_prompts} prompts")
             
+            # Calculate buffer factor for post-processing filters
+            buffer_factor = self._calculate_buffer_factor()
+            buffered_prompts = int(total_prompts * buffer_factor)
+            logger.info(
+                f"Generating {buffered_prompts} prompts (buffer factor: {buffer_factor:.2f}x) "
+                f"to account for post-processing filters"
+            )
+            
             # Split into chunks
             if progress_callback:
                 progress_callback("Splitting text into chunks...", 10)
@@ -113,9 +121,9 @@ class StoryProcessor:
             api_manager = APIManager(self.settings.api_config)
             
             try:
-                # Process chunks
+                # Process chunks with buffered prompt count
                 all_scenes = []
-                prompts_per_chunk = max(1, total_prompts // total_chunks)
+                prompts_per_chunk = max(1, buffered_prompts // total_chunks)
                 
                 start_chunk = metadata["processed_chunks"]
                 
@@ -161,11 +169,12 @@ class StoryProcessor:
                     progress_callback("Post-processing prompts...", 90)
                 
                 original_count = len(all_scenes)
-                all_scenes = self._post_process_scenes(all_scenes)
+                all_scenes = self._post_process_scenes(all_scenes, total_prompts)
                 
                 logger.info(
                     f"Post-processing complete. "
-                    f"Scenes: {original_count} -> {len(all_scenes)}"
+                    f"Scenes: {original_count} -> {len(all_scenes)} "
+                    f"(target: {total_prompts})"
                 )
                 
                 # Finalize metadata
@@ -399,12 +408,17 @@ class StoryProcessor:
         
         return csv_data
     
-    def _post_process_scenes(self, scenes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _post_process_scenes(
+        self, 
+        scenes: List[Dict[str, Any]], 
+        target_count: int
+    ) -> List[Dict[str, Any]]:
         """
         Post-process scenes with deduplication and quality filtering.
         
         Args:
             scenes: List of scene dictionaries
+            target_count: Target number of prompts to maintain
             
         Returns:
             Processed list of scenes
@@ -426,6 +440,11 @@ class StoryProcessor:
         if self.settings.enable_enhancement:
             logger.info("Enhancing prompts")
             scenes = self._enhance_scenes(scenes)
+        
+        # Trim to target count if we have too many scenes
+        if len(scenes) > target_count:
+            logger.info(f"Trimming {len(scenes)} scenes to target count of {target_count}")
+            scenes = scenes[:target_count]
         
         # Recalculate timestamps after filtering
         scenes = self._recalculate_timestamps(scenes)
@@ -518,6 +537,48 @@ class StoryProcessor:
             'min_quality_score': min(quality_scores) if quality_scores else 0,
             'max_quality_score': max(quality_scores) if quality_scores else 0
         }
+    
+    def _calculate_buffer_factor(self) -> float:
+        """
+        Calculate buffer factor for generating extra prompts.
+        
+        The buffer accounts for expected losses during post-processing:
+        - Deduplication can remove 30-50% of prompts (depending on text repetition)
+        - Quality filtering can remove 20-40% of prompts (depending on AI quality)
+        - Combined effect can reduce count by 50-75% in worst cases
+        
+        Returns:
+            Buffer multiplier (e.g., 2.0 means generate 2x the target)
+        """
+        buffer = 1.0
+        
+        # Add buffer for deduplication
+        if self.settings.enable_deduplication:
+            # Higher threshold means more aggressive filtering
+            # Empirically, dedup can remove 30-50% with biographical texts
+            dedup_factor = 1.8
+            if self.settings.deduplication_threshold >= 0.9:
+                dedup_factor = 1.5  # Less aggressive
+            elif self.settings.deduplication_threshold <= 0.8:
+                dedup_factor = 2.0  # More aggressive
+            buffer *= dedup_factor
+        
+        # Add buffer for quality filtering
+        if self.settings.enable_quality_filter:
+            # Higher min score means more aggressive filtering
+            # Quality filtering can remove 20-40% depending on min_score
+            quality_factor = 1.4
+            if self.settings.min_quality_score >= 0.6:
+                quality_factor = 1.6  # More aggressive
+            elif self.settings.min_quality_score <= 0.4:
+                quality_factor = 1.25  # Less aggressive
+            buffer *= quality_factor
+        
+        # Cap maximum buffer at 3.0x to balance quality and API costs
+        # This ensures we generate enough prompts even with aggressive filtering
+        buffer = min(buffer, 3.0)
+        
+        return buffer
     
     def _get_recent_prompts(self, scenes: List[Dict[str, Any]], count: int = 3) -> List[str]:
         """
