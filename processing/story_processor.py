@@ -10,6 +10,8 @@ from api.api_manager import APIManager
 from processing.text_processor import TextProcessor
 from processing.prompt_templates import PromptTemplates
 from processing.scene_analyzer import SceneAnalyzer
+from processing.similarity import SimilarityCalculator
+from processing.prompt_quality import PromptQualityManager
 from utils.file_ops import save_json, save_text, save_csv, load_json
 from utils.retry_handler import RetryHandler
 from exceptions import TextProcessingError, APIError
@@ -38,6 +40,14 @@ class StoryProcessor:
             initial_delay=settings.initial_retry_delay,
             max_delay=settings.max_retry_delay,
             exponential_base=settings.retry_exponential_base
+        )
+        
+        # Initialize quality management tools
+        self.similarity_calculator = SimilarityCalculator(
+            threshold=settings.deduplication_threshold
+        )
+        self.quality_manager = PromptQualityManager(
+            enable_enhancement=settings.enable_enhancement
         )
     
     def process_file(
@@ -119,6 +129,9 @@ class StoryProcessor:
                     
                     chunk_text = chunks[chunk_idx]
                     
+                    # Get context from recent prompts for context-aware generation
+                    recent_prompts = self._get_recent_prompts(all_scenes, count=3)
+                    
                     # Generate prompts for chunk
                     chunk_scenes = self._process_chunk(
                         api_manager,
@@ -126,7 +139,8 @@ class StoryProcessor:
                         chunk_idx,
                         total_chunks,
                         prompts_per_chunk,
-                        len(all_scenes)
+                        len(all_scenes),
+                        recent_prompts
                     )
                     
                     all_scenes.extend(chunk_scenes)
@@ -142,10 +156,27 @@ class StoryProcessor:
                     if progress_callback:
                         progress_callback(chunk_msg, 10 + (80 * (chunk_idx + 1) / total_chunks))
                 
+                # Post-processing: deduplication and quality filtering
+                if progress_callback:
+                    progress_callback("Post-processing prompts...", 90)
+                
+                original_count = len(all_scenes)
+                all_scenes = self._post_process_scenes(all_scenes)
+                
+                logger.info(
+                    f"Post-processing complete. "
+                    f"Scenes: {original_count} -> {len(all_scenes)}"
+                )
+                
                 # Finalize metadata
                 metadata["total_prompts"] = len(all_scenes)
                 metadata["metadata"]["total_prompts"] = len(all_scenes)  # Update nested path too
                 metadata["scenes"] = all_scenes
+                
+                # Add quality metrics to metadata
+                metadata["metadata"]["quality_metrics"] = self._calculate_quality_metrics(all_scenes)
+                metadata["metadata"]["deduplication_enabled"] = self.settings.enable_deduplication
+                metadata["metadata"]["quality_filter_enabled"] = self.settings.enable_quality_filter
                 
                 # Save final outputs
                 if progress_callback:
@@ -214,13 +245,37 @@ class StoryProcessor:
         chunk_idx: int,
         total_chunks: int,
         prompts_needed: int,
-        scene_offset: int
+        scene_offset: int,
+        recent_prompts: Optional[List[str]] = None
     ) -> List[Dict[str, Any]]:
-        """Process a single text chunk."""
+        """
+        Process a single text chunk with context awareness.
+        
+        Args:
+            api_manager: API manager
+            chunk_text: Text chunk
+            chunk_idx: Chunk index
+            total_chunks: Total number of chunks
+            prompts_needed: Number of prompts needed
+            scene_offset: Scene offset for numbering
+            recent_prompts: Recent prompts for context (to avoid repetition)
+            
+        Returns:
+            List of scene dictionaries
+        """
         system_prompt = PromptTemplates.get_system_prompt(
             self.settings.visual_style,
             self.settings.dense_mode
         )
+        
+        # Add context awareness to user prompt
+        context_note = ""
+        if recent_prompts:
+            context_note = (
+                "\n\nIMPORTANT: Avoid repetition. Recent prompts for context "
+                "(generate different shots, angles, and visual elements):\n"
+                + "\n".join(f"- {p}" for p in recent_prompts)
+            )
         
         user_prompt = PromptTemplates.get_chunk_analysis_prompt(
             chunk_text,
@@ -228,7 +283,7 @@ class StoryProcessor:
             total_chunks,
             prompts_needed,
             self.settings.visual_style
-        )
+        ) + context_note
         
         # Generate prompts with retry
         response = self.retry_handler.retry(
@@ -343,3 +398,140 @@ class StoryProcessor:
             csv_data.append(row)
         
         return csv_data
+    
+    def _post_process_scenes(self, scenes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Post-process scenes with deduplication and quality filtering.
+        
+        Args:
+            scenes: List of scene dictionaries
+            
+        Returns:
+            Processed list of scenes
+        """
+        if not scenes:
+            return scenes
+        
+        # Deduplication
+        if self.settings.enable_deduplication:
+            logger.info(f"Running deduplication (threshold: {self.settings.deduplication_threshold})")
+            scenes = self.similarity_calculator.deduplicate_with_metadata(scenes, key='prompt')
+        
+        # Quality filtering
+        if self.settings.enable_quality_filter:
+            logger.info(f"Running quality filter (min score: {self.settings.min_quality_score})")
+            scenes = self._filter_low_quality_scenes(scenes)
+        
+        # Enhancement
+        if self.settings.enable_enhancement:
+            logger.info("Enhancing prompts")
+            scenes = self._enhance_scenes(scenes)
+        
+        # Recalculate timestamps after filtering
+        scenes = self._recalculate_timestamps(scenes)
+        
+        return scenes
+    
+    def _filter_low_quality_scenes(self, scenes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Filter out low-quality scenes.
+        
+        Args:
+            scenes: List of scene dictionaries
+            
+        Returns:
+            Filtered list of scenes
+        """
+        filtered_scenes = []
+        
+        for scene in scenes:
+            prompt = scene.get('prompt', '')
+            score = self.quality_manager.score_prompt(prompt)
+            
+            if score >= self.settings.min_quality_score:
+                filtered_scenes.append(scene)
+            else:
+                logger.debug(
+                    f"Filtered out low quality scene {scene.get('id', 'unknown')} "
+                    f"(score: {score:.2f})"
+                )
+        
+        removed_count = len(scenes) - len(filtered_scenes)
+        if removed_count > 0:
+            logger.info(f"Filtered out {removed_count} low-quality scenes")
+        
+        return filtered_scenes
+    
+    def _enhance_scenes(self, scenes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Enhance prompts in scenes.
+        
+        Args:
+            scenes: List of scene dictionaries
+            
+        Returns:
+            Enhanced list of scenes
+        """
+        for scene in scenes:
+            if 'prompt' in scene:
+                scene['prompt'] = self.quality_manager.enhance_prompt(scene['prompt'])
+        
+        return scenes
+    
+    def _recalculate_timestamps(self, scenes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Recalculate timestamps after filtering.
+        
+        Args:
+            scenes: List of scene dictionaries
+            
+        Returns:
+            Scenes with updated timestamps
+        """
+        for idx, scene in enumerate(scenes):
+            scene['timestamp'] = idx * self.settings.frame_interval_seconds
+        
+        return scenes
+    
+    def _calculate_quality_metrics(self, scenes: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Calculate quality metrics for scenes.
+        
+        Args:
+            scenes: List of scene dictionaries
+            
+        Returns:
+            Quality metrics dictionary
+        """
+        if not scenes:
+            return {}
+        
+        prompts = [scene.get('prompt', '') for scene in scenes]
+        diversity = self.quality_manager.analyze_prompt_diversity(prompts)
+        
+        quality_scores = [self.quality_manager.score_prompt(p) for p in prompts]
+        
+        return {
+            'avg_prompt_length': diversity['avg_length'],
+            'vocabulary_size': diversity['vocabulary_size'],
+            'avg_quality_score': diversity['avg_quality_score'],
+            'min_quality_score': min(quality_scores) if quality_scores else 0,
+            'max_quality_score': max(quality_scores) if quality_scores else 0
+        }
+    
+    def _get_recent_prompts(self, scenes: List[Dict[str, Any]], count: int = 3) -> List[str]:
+        """
+        Get recent prompts for context-aware generation.
+        
+        Args:
+            scenes: List of scene dictionaries
+            count: Number of recent prompts to retrieve
+            
+        Returns:
+            List of recent prompt texts
+        """
+        if not scenes:
+            return []
+        
+        recent_scenes = scenes[-count:] if len(scenes) >= count else scenes
+        return [scene.get('prompt', '') for scene in recent_scenes]

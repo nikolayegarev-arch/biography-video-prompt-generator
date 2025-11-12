@@ -247,12 +247,40 @@ class MainWindow(ctk.CTk):
             variable=self.dense_mode_var
         ).pack(anchor="w", padx=20, pady=(5, 5))
         
-        self.character_consistency_var = ctk.BooleanVar(value=False)
+                self.character_consistency_var = ctk.BooleanVar(value=False)
         ctk.CTkCheckBox(
             options_frame,
             text="Character Consistency",
             variable=self.character_consistency_var
         ).pack(anchor="w", padx=20, pady=(5, 15))
+        
+        # Quality settings separator
+        ctk.CTkLabel(
+            options_frame,
+            text="Quality Settings:",
+            font=ctk.CTkFont(size=12, weight="bold")
+        ).pack(anchor="w", padx=10, pady=(10, 5))
+        
+        self.deduplication_var = ctk.BooleanVar(value=True)
+        ctk.CTkCheckBox(
+            options_frame,
+            text="Enable Deduplication (remove similar prompts)",
+            variable=self.deduplication_var
+        ).pack(anchor="w", padx=20, pady=2)
+        
+        self.quality_filter_var = ctk.BooleanVar(value=True)
+        ctk.CTkCheckBox(
+            options_frame,
+            text="Enable Quality Filter (remove low-quality prompts)",
+            variable=self.quality_filter_var
+        ).pack(anchor="w", padx=20, pady=2)
+        
+        self.enhancement_var = ctk.BooleanVar(value=True)
+        ctk.CTkCheckBox(
+            options_frame,
+            text="Enable Enhancement (auto-improve prompts)",
+            variable=self.enhancement_var
+        ).pack(anchor="w", padx=20, pady=(2, 10))
         
         # Progress section
         progress_frame = ctk.CTkFrame(middle_frame)
@@ -461,6 +489,9 @@ class MainWindow(ctk.CTk):
                 visual_style=self.visual_style_var.get(),
                 dense_mode=self.dense_mode_var.get(),
                 character_consistency=self.character_consistency_var.get(),
+                enable_deduplication=self.deduplication_var.get(),
+                enable_quality_filter=self.quality_filter_var.get(),
+                enable_enhancement=self.enhancement_var.get(),
                 api_config=api_config,
                 input_folder=self.input_folder_var.get(),
                 output_folder=self.output_folder_var.get()

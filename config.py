@@ -41,6 +41,13 @@ class Settings:
     chunk_size: int = 1000  # Words per chunk
     scene_duration: float = 6.0  # Seconds per scene (5-7 range)
     
+    # Quality settings
+    enable_deduplication: bool = True  # Remove duplicate prompts
+    deduplication_threshold: float = 0.85  # Similarity threshold (0.0-1.0)
+    enable_quality_filter: bool = True  # Filter low-quality prompts
+    min_quality_score: float = 0.5  # Minimum quality score (0.0-1.0)
+    enable_enhancement: bool = True  # Auto-enhance prompts
+    
     # API configuration
     api_config: APIConfig = field(default_factory=APIConfig)
     
@@ -62,6 +69,10 @@ class Settings:
             raise ValueError("narration_speed_wpm must be between 100 and 200")
         if not 5 <= self.scene_duration <= 7:
             self.scene_duration = 6.0  # Default to middle value
+        if not 0.0 <= self.deduplication_threshold <= 1.0:
+            raise ValueError("deduplication_threshold must be between 0.0 and 1.0")
+        if not 0.0 <= self.min_quality_score <= 1.0:
+            raise ValueError("min_quality_score must be between 0.0 and 1.0")
 
 
 @dataclass
