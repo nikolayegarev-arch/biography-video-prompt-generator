@@ -232,7 +232,7 @@ class MainWindow(ctk.CTk):
         
         # Options section
         options_frame = ctk.CTkFrame(middle_frame)
-        options_frame.grid(row=0, column=0, padx=10, pady=(10, 5), sticky="ew")
+        options_frame.grid(row=0, column=0, padx=10, pady=(10, 5), sticky="nsew")
         
         ctk.CTkLabel(
             options_frame,
@@ -245,14 +245,14 @@ class MainWindow(ctk.CTk):
             options_frame,
             text="Dense Mode (detailed prompts)",
             variable=self.dense_mode_var
-        ).pack(anchor="w", padx=20, pady=2)
+        ).pack(anchor="w", padx=20, pady=(5, 5))
         
-        self.character_consistency_var = ctk.BooleanVar(value=False)
+                self.character_consistency_var = ctk.BooleanVar(value=False)
         ctk.CTkCheckBox(
             options_frame,
             text="Character Consistency",
             variable=self.character_consistency_var
-        ).pack(anchor="w", padx=20, pady=2)
+        ).pack(anchor="w", padx=20, pady=(5, 15))
         
         # Quality settings separator
         ctk.CTkLabel(
@@ -280,9 +280,7 @@ class MainWindow(ctk.CTk):
             options_frame,
             text="Enable Enhancement (auto-improve prompts)",
             variable=self.enhancement_var
-        ).pack(anchor="w", padx=20, pady=2)
-        
-        options_frame.pack_configure(pady=(10, 5))
+        ).pack(anchor="w", padx=20, pady=(2, 10))
         
         # Progress section
         progress_frame = ctk.CTkFrame(middle_frame)
@@ -511,6 +509,9 @@ class MainWindow(ctk.CTk):
                 
                 def progress_callback(message: str, percent: float):
                     self.update_progress(message, percent / 100.0)
+                    # Also log chunk completion messages to GUI
+                    if "Chunk" in message and "complete" in message:
+                        self.log(f"  {message}")
                 
                 try:
                     result = processor.process_file(

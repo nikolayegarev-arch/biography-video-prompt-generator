@@ -18,6 +18,9 @@ from exceptions import TextProcessingError, APIError
 
 logger = logging.getLogger(__name__)
 
+# Alias for backward compatibility
+ProcessingConfig = Settings
+
 
 class StoryProcessor:
     """Process biographical stories and generate image prompts."""
@@ -147,10 +150,11 @@ class StoryProcessor:
                     metadata["scenes"] = all_scenes
                     save_json(partial_path, metadata)
                     
-                    logger.info(
-                        f"Chunk {chunk_idx + 1}/{total_chunks} complete. "
-                        f"Total scenes: {len(all_scenes)}"
-                    )
+                    # Log to both logger and GUI
+                    chunk_msg = f"Chunk {chunk_idx + 1}/{total_chunks} complete. Total scenes: {len(all_scenes)}"
+                    logger.info(chunk_msg)
+                    if progress_callback:
+                        progress_callback(chunk_msg, 10 + (80 * (chunk_idx + 1) / total_chunks))
                 
                 # Post-processing: deduplication and quality filtering
                 if progress_callback:
@@ -166,6 +170,7 @@ class StoryProcessor:
                 
                 # Finalize metadata
                 metadata["total_prompts"] = len(all_scenes)
+                metadata["metadata"]["total_prompts"] = len(all_scenes)  # Update nested path too
                 metadata["scenes"] = all_scenes
                 
                 # Add quality metrics to metadata
