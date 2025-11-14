@@ -441,10 +441,21 @@ class StoryProcessor:
             logger.info("Enhancing prompts")
             scenes = self._enhance_scenes(scenes)
         
-        # Trim to target count if we have too many scenes
-        if len(scenes) > target_count:
-            logger.info(f"Trimming {len(scenes)} scenes to target count of {target_count}")
+        # Only trim if we have significantly more than target (>10% excess)
+        # This ensures we always meet the 6-second interval requirement
+        # while avoiding excessive over-generation
+        max_acceptable = int(target_count * 1.10)
+        if len(scenes) > max_acceptable:
+            logger.info(f"Trimming {len(scenes)} scenes to {target_count} (max acceptable: {max_acceptable})")
             scenes = scenes[:target_count]
+        elif len(scenes) < target_count:
+            # Log warning if we're under target
+            shortage = target_count - len(scenes)
+            logger.warning(
+                f"Generated {len(scenes)} prompts, which is {shortage} short of target {target_count}. "
+                f"This may result in longer intervals between images. "
+                f"Consider disabling some quality filters or adjusting buffer factors."
+            )
         
         # Recalculate timestamps after filtering
         scenes = self._recalculate_timestamps(scenes)
@@ -556,27 +567,33 @@ class StoryProcessor:
         if self.settings.enable_deduplication:
             # Higher threshold means more aggressive filtering
             # Empirically, dedup can remove 30-50% with biographical texts
-            dedup_factor = 1.8
+            # Increased factors to ensure we always meet target
+            dedup_factor = 2.2  # Conservative default (was 1.8)
             if self.settings.deduplication_threshold >= 0.9:
-                dedup_factor = 1.5  # Less aggressive
+                dedup_factor = 1.8  # Less aggressive (was 1.5)
             elif self.settings.deduplication_threshold <= 0.8:
-                dedup_factor = 2.0  # More aggressive
+                dedup_factor = 2.5  # More aggressive (was 2.0)
             buffer *= dedup_factor
         
         # Add buffer for quality filtering
         if self.settings.enable_quality_filter:
             # Higher min score means more aggressive filtering
             # Quality filtering can remove 20-40% depending on min_score
-            quality_factor = 1.4
+            # Increased factors to ensure we always meet target
+            quality_factor = 1.6  # Conservative default (was 1.4)
             if self.settings.min_quality_score >= 0.6:
-                quality_factor = 1.6  # More aggressive
+                quality_factor = 2.0  # More aggressive (was 1.6)
             elif self.settings.min_quality_score <= 0.4:
-                quality_factor = 1.25  # Less aggressive
+                quality_factor = 1.4  # Less aggressive (was 1.25)
             buffer *= quality_factor
         
-        # Cap maximum buffer at 3.0x to balance quality and API costs
-        # This ensures we generate enough prompts even with aggressive filtering
-        buffer = min(buffer, 3.0)
+        # Add 15% safety margin to ensure we always meet the target
+        # This accounts for variability in filtering effectiveness
+        buffer *= 1.15
+        
+        # Cap maximum buffer at 4.0x to balance quality and API costs
+        # Increased from 3.0x to ensure sufficient prompts for 6-second intervals
+        buffer = min(buffer, 4.0)
         
         return buffer
     
